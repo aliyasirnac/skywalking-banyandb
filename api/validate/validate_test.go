@@ -47,3 +47,66 @@ func TestMeasureShardingKeyNil(t *testing.T) {
 	err := Measure(measure)
 	assert.NoError(t, err)
 }
+
+func TestMeasureShardingKeyValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		entity      []string
+		shardingKey []string
+		wantErr     bool
+	}{
+		{
+			name:        "valid sharding key (same as entity)",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"service_id", "instance_id"},
+			wantErr:     false,
+		},
+		{
+			name:        "valid sharding key (superset of entity)",
+			entity:      []string{"service_id"},
+			shardingKey: []string{"service_id", "instance_id"},
+			wantErr:     false,
+		},
+		{
+			name:        "invalid sharding key (missing entity tag)",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"service_id"},
+			wantErr:     true,
+		},
+		{
+			name:        "invalid sharding key (completely different)",
+			entity:      []string{"service_id"},
+			shardingKey: []string{"instance_id"},
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			measure := &databasev1.Measure{
+				Metadata: &commonv1.Metadata{Name: "test", Group: "group"},
+				Entity:   &databasev1.Entity{TagNames: tt.entity},
+				TagFamilies: []*databasev1.TagFamilySpec{
+					{
+						Name: "f1",
+						Tags: []*databasev1.TagSpec{
+							{Name: "service_id", Type: databasev1.TagType_TAG_TYPE_STRING},
+							{Name: "instance_id", Type: databasev1.TagType_TAG_TYPE_STRING},
+						},
+					},
+				},
+			}
+			if tt.shardingKey != nil {
+				measure.ShardingKey = &databasev1.ShardingKey{TagNames: tt.shardingKey}
+			}
+
+			err := Measure(measure)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "ShardingKey must contain all Entity tags")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

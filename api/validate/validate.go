@@ -164,6 +164,18 @@ func Measure(measure *databasev1.Measure) error {
 	if measure.IndexMode && len(measure.Fields) > 0 {
 		return errors.New("index mode is enabled, but fields are not empty")
 	}
+
+	if measure.ShardingKey != nil && len(measure.ShardingKey.TagNames) > 0 {
+		shardingKeyTags := make(map[string]struct{}, len(measure.ShardingKey.TagNames))
+		for _, tag := range measure.ShardingKey.TagNames {
+			shardingKeyTags[tag] = struct{}{}
+		}
+		for _, tag := range measure.Entity.TagNames {
+			if _, ok := shardingKeyTags[tag]; !ok {
+				return errors.New("ShardingKey must contain all Entity tags to guarantee entity locality")
+			}
+		}
+	}
 	return tagFamily(measure.TagFamilies)
 }
 

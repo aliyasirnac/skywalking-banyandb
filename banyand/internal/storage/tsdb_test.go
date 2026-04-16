@@ -516,7 +516,7 @@ func TestCollectWithPartialClosedSegments(t *testing.T) {
 		TTL:                IntervalRule{Unit: DAY, Num: 7},
 		ShardNum:           2,
 		TSTableCreator:     MockTSTableCreator,
-		SegmentIdleTimeout: 100 * time.Millisecond, // Short idle timeout for testing
+		SegmentIdleTimeout: 300 * time.Millisecond, // Short idle timeout for testing
 	}
 
 	ctx := context.Background()

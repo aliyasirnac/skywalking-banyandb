@@ -166,13 +166,12 @@ func Measure(measure *databasev1.Measure) error {
 	}
 
 	if measure.ShardingKey != nil && len(measure.ShardingKey.TagNames) > 0 {
-		shardingKeyTags := make(map[string]struct{}, len(measure.ShardingKey.TagNames))
-		for _, tag := range measure.ShardingKey.TagNames {
-			shardingKeyTags[tag] = struct{}{}
+		if len(measure.ShardingKey.TagNames) > len(measure.Entity.TagNames) {
+			return errors.New("ShardingKey must be a prefix of Entity tags to guarantee entity locality")
 		}
-		for _, tag := range measure.Entity.TagNames {
-			if _, ok := shardingKeyTags[tag]; !ok {
-				return errors.New("ShardingKey must contain all Entity tags to guarantee entity locality")
+		for i, tag := range measure.ShardingKey.TagNames {
+			if measure.Entity.TagNames[i] != tag {
+				return errors.New("ShardingKey must be a prefix of Entity tags to guarantee entity locality")
 			}
 		}
 	}

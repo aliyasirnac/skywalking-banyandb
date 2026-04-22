@@ -178,11 +178,11 @@ func Measure(measure *databasev1.Measure) error {
 
 	if measure.ShardingKey != nil && len(measure.ShardingKey.TagNames) > 0 {
 		if len(measure.ShardingKey.TagNames) > len(measure.Entity.TagNames) {
-			return errors.New("ShardingKey must be a prefix of Entity tags to guarantee entity locality")
+			return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality", measure.ShardingKey.TagNames, measure.Entity.TagNames)
 		}
 		for i, tag := range measure.ShardingKey.TagNames {
 			if measure.Entity.TagNames[i] != tag {
-				return errors.New("ShardingKey must be a prefix of Entity tags to guarantee entity locality")
+				return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality", measure.ShardingKey.TagNames, measure.Entity.TagNames)
 			}
 		}
 	}

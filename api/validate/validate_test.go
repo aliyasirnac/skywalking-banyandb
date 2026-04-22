@@ -56,25 +56,25 @@ func TestMeasureShardingKeyValidation(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name:        "valid sharding key (same as entity)",
+			name:        "valid sharding key (identical to entity)",
 			entity:      []string{"service_id", "instance_id"},
 			shardingKey: []string{"service_id", "instance_id"},
 			wantErr:     false,
 		},
 		{
-			name:        "valid sharding key (prefix of entity)",
+			name:        "valid sharding key (prefix of entity, not identical)",
 			entity:      []string{"service_id", "instance_id"},
 			shardingKey: []string{"service_id"},
 			wantErr:     false,
 		},
 		{
-			name:        "invalid sharding key (not a prefix)",
+			name:        "invalid sharding key (subset with different tag)",
 			entity:      []string{"service_id", "instance_id"},
 			shardingKey: []string{"instance_id"},
 			wantErr:     true,
 		},
 		{
-			name:        "invalid sharding key (wrong order)",
+			name:        "invalid sharding key (same tags, wrong order)",
 			entity:      []string{"service_id", "instance_id"},
 			shardingKey: []string{"instance_id", "service_id"},
 			wantErr:     true,
@@ -109,7 +109,7 @@ func TestMeasureShardingKeyValidation(t *testing.T) {
 			err := Measure(measure)
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "ShardingKey must be a prefix of Entity tags")
+				assert.Contains(t, err.Error(), "must be a prefix of Entity tags")
 			} else {
 				assert.NoError(t, err)
 			}

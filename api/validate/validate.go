@@ -175,18 +175,27 @@ func Measure(measure *databasev1.Measure) error {
 	if measure.IndexMode && len(measure.Fields) > 0 {
 		return errors.New("index mode is enabled, but fields are not empty")
 	}
+	return tagFamily(measure.TagFamilies)
+}
 
-	if measure.ShardingKey != nil && len(measure.ShardingKey.TagNames) > 0 {
-		if len(measure.ShardingKey.TagNames) > len(measure.Entity.TagNames) {
-			return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality", measure.ShardingKey.TagNames, measure.Entity.TagNames)
-		}
-		for i, tag := range measure.ShardingKey.TagNames {
-			if measure.Entity.TagNames[i] != tag {
-				return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality", measure.ShardingKey.TagNames, measure.Entity.TagNames)
-			}
+// CheckShardingKeyPrefix checks whether the ShardingKey is a sequential prefix of Entity tags.
+// This is an advisory check — it does not block schema creation but signals a potential
+// issue that may affect entity locality guarantees.
+func CheckShardingKeyPrefix(measure *databasev1.Measure) error {
+	if measure == nil || measure.Entity == nil || measure.ShardingKey == nil || len(measure.ShardingKey.TagNames) == 0 {
+		return nil
+	}
+	if len(measure.ShardingKey.TagNames) > len(measure.Entity.TagNames) {
+		return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality",
+			measure.ShardingKey.TagNames, measure.Entity.TagNames)
+	}
+	for idx, tag := range measure.ShardingKey.TagNames {
+		if measure.Entity.TagNames[idx] != tag {
+			return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality",
+				measure.ShardingKey.TagNames, measure.Entity.TagNames)
 		}
 	}
-	return tagFamily(measure.TagFamilies)
+	return nil
 }
 
 // Trace validates the provided Trace object.

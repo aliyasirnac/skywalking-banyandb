@@ -764,6 +764,9 @@ func (r *SchemaRegistry) CreateMeasure(ctx context.Context, measure *databasev1.
 	if validateErr := validate.Measure(measure); validateErr != nil {
 		return 0, validateErr
 	}
+	if prefixWarn := validate.CheckShardingKeyPrefix(measure); prefixWarn != nil {
+		r.l.Warn().Err(prefixWarn).Str("measure", measure.GetMetadata().GetName()).Msg("sharding key is not a prefix of entity tags")
+	}
 	now := time.Now().UnixNano()
 	measure.Metadata.ModRevision = now
 	measure.UpdatedAt = timestamppb.Now()
@@ -779,6 +782,9 @@ func (r *SchemaRegistry) UpdateMeasure(ctx context.Context, measure *databasev1.
 	}
 	if validateErr := validate.Measure(measure); validateErr != nil {
 		return 0, validateErr
+	}
+	if prefixWarn := validate.CheckShardingKeyPrefix(measure); prefixWarn != nil {
+		r.l.Warn().Err(prefixWarn).Str("measure", measure.GetMetadata().GetName()).Msg("sharding key is not a prefix of entity tags")
 	}
 	now := time.Now().UnixNano()
 	measure.Metadata.ModRevision = now

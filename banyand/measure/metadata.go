@@ -224,6 +224,9 @@ func (sr *schemaRepo) OnAddOrUpdate(metadata schema.Metadata) {
 			sr.l.Warn().Err(err).Msg("measure is ignored")
 			return
 		}
+		if prefixWarn := validate.CheckShardingKeyPrefix(m); prefixWarn != nil {
+			sr.l.Warn().Err(prefixWarn).Str("measure", m.GetMetadata().GetName()).Msg("sharding key is not a prefix of entity tags")
+		}
 		sr.SendMetadataEvent(resourceSchema.MetadataEvent{
 			Typ:      resourceSchema.EventAddOrUpdate,
 			Kind:     resourceSchema.EventKindResource,

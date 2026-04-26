@@ -48,7 +48,26 @@ func TestMeasureShardingKeyNil(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestMeasureShardingKeyValidation(t *testing.T) {
+func TestMeasurePassesWithNonPrefixShardingKey(t *testing.T) {
+	measure := &databasev1.Measure{
+		Metadata: &commonv1.Metadata{Name: "endpoint_cpm", Group: "sw_metric"},
+		Entity:   &databasev1.Entity{TagNames: []string{"entity_id"}},
+		TagFamilies: []*databasev1.TagFamilySpec{
+			{
+				Name: "default",
+				Tags: []*databasev1.TagSpec{
+					{Name: "entity_id", Type: databasev1.TagType_TAG_TYPE_STRING},
+					{Name: "service_id", Type: databasev1.TagType_TAG_TYPE_STRING},
+				},
+			},
+		},
+		ShardingKey: &databasev1.ShardingKey{TagNames: []string{"service_id"}},
+	}
+	err := Measure(measure)
+	assert.NoError(t, err, "Measure() must not reject a non-prefix sharding key")
+}
+
+func TestCheckShardingKeyPrefix(t *testing.T) {
 	tests := []struct {
 		name        string
 		entity      []string
@@ -85,6 +104,18 @@ func TestMeasureShardingKeyValidation(t *testing.T) {
 			shardingKey: []string{"service_id", "instance_id"},
 			wantErr:     true,
 		},
+		{
+			name:        "nil sharding key",
+			entity:      []string{"service_id"},
+			shardingKey: nil,
+			wantErr:     false,
+		},
+		{
+			name:        "empty sharding key",
+			entity:      []string{"service_id"},
+			shardingKey: []string{},
+			wantErr:     false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -106,12 +137,12 @@ func TestMeasureShardingKeyValidation(t *testing.T) {
 				measure.ShardingKey = &databasev1.ShardingKey{TagNames: tt.shardingKey}
 			}
 
-			err := Measure(measure)
+			checkErr := CheckShardingKeyPrefix(measure)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "must be a prefix of Entity tags")
+				assert.Error(t, checkErr)
+				assert.Contains(t, checkErr.Error(), "must be a prefix of Entity tags")
 			} else {
-				assert.NoError(t, err)
+				assert.NoError(t, checkErr)
 			}
 		})
 	}

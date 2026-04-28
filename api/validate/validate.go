@@ -175,25 +175,37 @@ func Measure(measure *databasev1.Measure) error {
 	if measure.IndexMode && len(measure.Fields) > 0 {
 		return errors.New("index mode is enabled, but fields are not empty")
 	}
+
 	return tagFamily(measure.TagFamilies)
 }
 
-// CheckShardingKeyPrefix checks whether the ShardingKey is a sequential prefix of Entity tags.
-// This is an advisory check — it does not block schema creation but signals a potential
-// issue that may affect entity locality guarantees.
-func CheckShardingKeyPrefix(measure *databasev1.Measure) error {
+// CheckShardingKeySubset checks whether every ShardingKey tag exists in Entity tags
+// and the shared tags appear in the same relative order.
+func CheckShardingKeySubset(measure *databasev1.Measure) error {
 	if measure == nil || measure.Entity == nil || measure.ShardingKey == nil || len(measure.ShardingKey.TagNames) == 0 {
 		return nil
 	}
-	if len(measure.ShardingKey.TagNames) > len(measure.Entity.TagNames) {
-		return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality",
-			measure.ShardingKey.TagNames, measure.Entity.TagNames)
+	// A single entity tag may represent a composite identifier, e.g. OAP's entity_id,
+	// which can already encode the sharding key fields such as service_id.
+	// In that case, literal tag-name subset validation would produce false positives.
+	if len(measure.Entity.TagNames) == 1 {
+		return nil
 	}
-	for idx, tag := range measure.ShardingKey.TagNames {
-		if measure.Entity.TagNames[idx] != tag {
-			return fmt.Errorf("ShardingKey %v must be a prefix of Entity tags %v to guarantee entity locality",
+	entityIndex := make(map[string]int, len(measure.Entity.TagNames))
+	for idx, tag := range measure.Entity.TagNames {
+		entityIndex[tag] = idx
+	}
+	prevPos := -1
+	for _, shardTag := range measure.ShardingKey.TagNames {
+		pos, exists := entityIndex[shardTag]
+		if !exists {
+			return fmt.Errorf("ShardingKey tag %q is not present in Entity tags %v", shardTag, measure.Entity.TagNames)
+		}
+		if pos <= prevPos {
+			return fmt.Errorf("ShardingKey %v is not in the same relative order as Entity tags %v",
 				measure.ShardingKey.TagNames, measure.Entity.TagNames)
 		}
+		prevPos = pos
 	}
 	return nil
 }

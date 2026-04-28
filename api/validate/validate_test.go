@@ -67,42 +67,64 @@ func TestMeasurePassesWithNonPrefixShardingKey(t *testing.T) {
 	assert.NoError(t, err, "Measure() must not reject a non-prefix sharding key")
 }
 
-func TestCheckShardingKeyPrefix(t *testing.T) {
+func TestCheckShardingKeySubset(t *testing.T) {
 	tests := []struct {
 		name        string
+		errContains string
 		entity      []string
 		shardingKey []string
 		wantErr     bool
 	}{
 		{
-			name:        "valid sharding key (identical to entity)",
-			entity:      []string{"service_id", "instance_id"},
-			shardingKey: []string{"service_id", "instance_id"},
-			wantErr:     false,
-		},
-		{
-			name:        "valid sharding key (prefix of entity, not identical)",
-			entity:      []string{"service_id", "instance_id"},
+			name:        "single entity tag — composite-id pattern, always skip",
+			entity:      []string{"entity_id"},
 			shardingKey: []string{"service_id"},
 			wantErr:     false,
 		},
 		{
-			name:        "invalid sharding key (subset with different tag)",
-			entity:      []string{"service_id", "instance_id"},
-			shardingKey: []string{"instance_id"},
-			wantErr:     true,
+			name:        "valid subset, same order",
+			entity:      []string{"service_id", "instance_id", "endpoint_id"},
+			shardingKey: []string{"service_id", "endpoint_id"},
+			wantErr:     false,
 		},
 		{
-			name:        "invalid sharding key (same tags, wrong order)",
+			name:        "valid subset, identical to entity",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"service_id", "instance_id"},
+			wantErr:     false,
+		},
+		{
+			name:        "valid subset, single sharding key tag in multi-entity",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"instance_id"},
+			wantErr:     false,
+		},
+		{
+			name:        "invalid — sharding key tag not in entity",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"endpoint_id"},
+			wantErr:     true,
+			errContains: "is not present in Entity tags",
+		},
+		{
+			name:        "invalid — superset of entity",
+			entity:      []string{"service_id"},
+			shardingKey: []string{"service_id", "instance_id"},
+			wantErr:     false, // single entity tag — skip
+		},
+		{
+			name:        "invalid — superset of multi-entity",
+			entity:      []string{"service_id", "instance_id"},
+			shardingKey: []string{"service_id", "instance_id", "endpoint_id"},
+			wantErr:     true,
+			errContains: "is not present in Entity tags",
+		},
+		{
+			name:        "invalid — wrong relative order",
 			entity:      []string{"service_id", "instance_id"},
 			shardingKey: []string{"instance_id", "service_id"},
 			wantErr:     true,
-		},
-		{
-			name:        "invalid sharding key (superset of entity)",
-			entity:      []string{"service_id"},
-			shardingKey: []string{"service_id", "instance_id"},
-			wantErr:     true,
+			errContains: "is not in the same relative order",
 		},
 		{
 			name:        "nil sharding key",
@@ -123,24 +145,16 @@ func TestCheckShardingKeyPrefix(t *testing.T) {
 			measure := &databasev1.Measure{
 				Metadata: &commonv1.Metadata{Name: "test", Group: "group"},
 				Entity:   &databasev1.Entity{TagNames: tt.entity},
-				TagFamilies: []*databasev1.TagFamilySpec{
-					{
-						Name: "f1",
-						Tags: []*databasev1.TagSpec{
-							{Name: "service_id", Type: databasev1.TagType_TAG_TYPE_STRING},
-							{Name: "instance_id", Type: databasev1.TagType_TAG_TYPE_STRING},
-						},
-					},
-				},
 			}
 			if tt.shardingKey != nil {
 				measure.ShardingKey = &databasev1.ShardingKey{TagNames: tt.shardingKey}
 			}
-
-			checkErr := CheckShardingKeyPrefix(measure)
+			checkErr := CheckShardingKeySubset(measure)
 			if tt.wantErr {
 				assert.Error(t, checkErr)
-				assert.Contains(t, checkErr.Error(), "must be a prefix of Entity tags")
+				if tt.errContains != "" {
+					assert.Contains(t, checkErr.Error(), tt.errContains)
+				}
 			} else {
 				assert.NoError(t, checkErr)
 			}
